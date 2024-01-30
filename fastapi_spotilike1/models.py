@@ -2,6 +2,7 @@ from sqlalchemy import Column, Integer, String, ForeignKey, Text, Time, Date
 from sqlalchemy.orm import declarative_base
 from sqlalchemy import Column, Integer, String, ForeignKey, Text, Date
 from .database import Base
+from pydantic import BaseModel
 
 Base = declarative_base()
 
@@ -21,4 +22,9 @@ class Artiste(Base):
     Avatar = Column(String)
     Biographie = Column(Text)
 
+class UtilisateurCreate(BaseModel):
+    # Définissez les champs de votre modèle UtilisateurCreate
+    Nom_utilisateur: str
+    Mot_de_passe: str
+    Email: str
 # Ajoutez d'autres modèles selon vos besoins
