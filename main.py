@@ -2,17 +2,23 @@
 from fastapi import FastAPI, Depends , HTTPException
 from sqlalchemy import Column, Integer, String, ForeignKey, Text, Time, Date
 from sqlalchemy.orm import Session
-from fastapi_spotilike1.database import get_db
-from fastapi_spotilike1.database import SessionLocal, engine
-#from fastapi_spotilike1.models import Album, Artiste, Genre, Morceau, Utilisateur  # Import depuis le dossier app.models
-from fastapi_spotilike1.crud import get_album
-
+from fastapi_spotilike1.database import get_db, SessionLocal, engine 
+from fastapi_spotilike1.crud import get_album, get_user_by_username
+from fastapi_spotilike1.models import Morceau
+from fastapi_spotilike1.models import Artiste
+from fastapi_spotilike1.security import verify_password
 from sqlalchemy.orm import declarative_base
 from typing import List
 from pydantic import BaseModel
-from fastapi.security import OAuth2PasswordBearer
-from fastapi_spotilike1 import database, crud, models
+from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
+from fastapi_spotilike1 import database, crud, models, token
 from fastapi_spotilike1.database import Base
+from datetime import timedelta, datetime
+from jose import jwt
+from fastapi.exceptions import HTTPException
+from fastapi_spotilike1.crud import MorceauCreate 
+from fastapi_spotilike1.models import ArtisteResponse
+from fastapi_spotilike1.models import GenreResponse
 
 
 # FastAPI app
@@ -24,8 +30,17 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 # Define your SQLAlchemy models
 Base = declarative_base()
 
+# Clé secrète pour signer le token (à remplacer par votre propre clé secrète)
+secret = "ea504dfd74cdc3fbddcb4e67c73b6070"
+ALGORITHM = "HS256"
+
 # Create the database tables
 Base.metadata.create_all(bind=engine)
+# Définition de la fonction get_token_header
+def get_token_header(x_token: str = Depends(oauth2_scheme)):
+    return x_token
+app = FastAPI(dependencies=[Depends(get_token_header)])
+
 
 class Album(Base):
     __tablename__ = "album"
@@ -66,7 +81,11 @@ class Utilisateur(Base):
     Email = Column(String, index=True)
 
 
-# Pydantic models for data validation
+# Pydantic 
+class Token(BaseModel):
+    access_token: str
+    token_type: str
+        
 class SongBase(BaseModel):
     Titre: str
     Duree: str
@@ -122,17 +141,21 @@ class UtilisateurCreate(UtilisateurBase):
 
 class UtilisateurResponse(UtilisateurBase):
     IDutilisateur: int
-    
-        
-# CRUD operations
-# You can define functions like `create_album`, `get_album`, etc., using the SQLAlchemy session
+
+class AlbumResponse(BaseModel):
+    IDalbum: int
+    Titre: str
+    Pochette: str
+    Date_sortie: str
+    liste_morceaux: str
+    Artiste_ID: int
+
 
 # Endpoints
     
 #1. GET - /api/albums : Récupère la liste de tous les albums    
 @app.post("/api/albums", response_model=AlbumResponse)
 async def create_album(album: AlbumCreate, db: Session = Depends(get_db)):
-    # Implement your logic to create an album in the database
     pass
 
 # 2. GET - /api/albums/:id : Récupère les détails de l’album précisé par :id
@@ -175,14 +198,110 @@ async def get_artist_songs(artist_id: int, db: Session = Depends(database.get_db
 async def create_user(user: UtilisateurCreate, db: Session = Depends(database.get_db)):
     db_user = crud.create_user(db, user)
     return db_user
-#
-#
-#
-#
-#
-#
-#
-#
+
+#7. POST - /api/users/login : Connexion d’un utilisateur (JWT)
+# Fonction pour créer un token JWT
+def create_jwt_token(username: str) -> str:
+    expiration = datetime.utcnow() + timedelta(hours=1)  # Définissez la durée de validité du token
+    token_data = {"sub": username, "exp": expiration}
+    token = jwt.encode(token_data, "secret", algorithm="HS256")
+    return token
+def get_user_by_username(db: Session, username: str):
+    return db.query(Utilisateur).filter(Utilisateur.Nom_utilisateur == username).first()
+def authenticate_user(username: str, password: str):
+    user = get_user_by_username(username)
+    if not user or not verify_password(password, user["password"]):
+        return False
+    return user
+
+def get_current_user(token: str = Depends(oauth2_scheme)):
+    pass
+@app.post("/api/users/login", response_model=Token)
+async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends()):
+    user = authenticate_user(form_data.username, form_data.password)
+    if not user:
+        raise HTTPException(
+            status_code=401,
+            detail="Nom d'utilisateur ou mot de passe incorrect",
+            headers={"WWW-Authenticate": "Bearer"},
+        ) 
+    # Créer et retourner le token JWT
+    token = create_jwt_token(user.username)
+    return {"access_token": token, "token_type": "bearer"}
+
+#8. POST - /api/albums : Ajout d’un album
+@app.post("/api/albums", response_model=models.AlbumCreate)
+async def create_album(album: crud.AlbumCreate, db: Session = Depends(database.get_db)):
+    return crud.create_album(db=db, album=album)
+
+#9. POST - /api/albums/:id/songs : Ajout d’un morceau dans l’album précisé par :id
+@app.post("/api/albums/{album_id}/songs", response_model=None)  #models.Morceau, response_model_exclude_unset=True)
+async def create_song_for_album(
+    album_id: int, song: crud.MorceauCreate, db: Session = Depends(database.get_db)
+):
+    return crud.create_song_for_album(db=db, album_id=album_id, song=song)
+
+#10. PUT - /api/artists/:id : Modification de l’artiste précisé par :id
+@app.put("/api/artists/{artist_id}", response_model=None) #models.Artiste)
+async def update_artist(
+    artist_id: int, updated_artist: crud.ArtisteUpdate, db: Session = Depends(database.get_db)
+):
+    db_artist = crud.update_artist(db=db, artist_id=artist_id, updated_artist=updated_artist)
+    if db_artist is None:
+        raise HTTPException(status_code=404, detail="Artiste not found")
+    return db_artist
+
+#11. PUT - /api/albums/:id : Modification de l’album précisé par :id
+@app.put("/api/albums/{album_id}", response_model=models.AlbumResponse)
+async def update_album(
+    album_id: int, updated_album: models.AlbumUpdate, db: Session = Depends(database.get_db)
+):
+    db_album = crud.update_album(db=db, album_id=album_id, updated_album=updated_album)
+    if db_album is None:
+        raise HTTPException(status_code=404, detail="Album not found")
+    return db_album
+
+#12. PUT - /api/genres/:id : Modification du genre précisé par :id
+@app.put("/api/genres/{genre_id}", response_model=models.GenreResponse)
+async def update_genre(
+    genre_id: int, updated_genre: models.GenreUpdate, db: Session = Depends(database.get_db)
+):
+    db_genre = crud.update_genre(db=db, genre_id=genre_id, updated_genre=updated_genre)
+    if db_genre is None:
+        raise HTTPException(status_code=404, detail="Genre not found")
+    return db_genre
+
+#13. DELETE - /api/users/:id : Suppression de utilisateur précisé par :id
+@app.delete("/api/users/{user_id}")
+async def delete_user(user_id: int, db: Session = Depends(get_db)):
+    db_user = crud.get_user(db, user_id)
+    if db_user is None:
+        raise HTTPException(status_code=404, detail="User not found")
+    crud.delete_user_related_items(db, user_id)
+
+    # Supprimer l'utilisateur
+    db_user = crud.delete_user(db, user_id)
+    return {"message": "User deleted successfully"}
+
+
+#14. DELETE - /api/albums/:id : Suppression de l’album précisé par :id
+async def delete_album(album_id: int, db: Session = Depends(database.get_db)):
+    db_album = crud.get_album(db, album_id)
+    if db_album is None:
+        raise HTTPException(status_code=404, detail="Album not found")
+    # Supprimer les morceaux liés à cet album
+    crud.delete_songs_by_album(db, album_id)
+    # Supprimer l'album lui-même
+    deleted_album = crud.delete_album(db, album_id)
+    return deleted_album
+
+#15. DELETE - /api/artists/:id : Supression de l’artiste précisé par :id
+@app.delete("/api/artists/{artist_id}", response_model=None) #models.Artiste)
+async def delete_artist_endpoint(artist_id: int, db: Session = Depends(database.get_db)):
+    db_artist = crud.delete_artist(db, artist_id)
+    if db_artist is None:
+        raise HTTPException(status_code=404, detail="Artiste not found")
+    return db_artist
 #
 #
 # Dependency to get the database session

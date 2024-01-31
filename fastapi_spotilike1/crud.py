@@ -1,9 +1,25 @@
 from sqlalchemy.orm import Session
 from . import models
 from .models import UtilisateurCreate
-#from .database import engine 
-#from .models import Album, Artiste, Genre, Morceau, Utilisateur
-#from .database import Base
+from .models import AlbumCreate
+from pydantic import BaseModel
+from typing import Optional
+from sqlalchemy.orm import Session
+from .models import Utilisateur, Morceau
+
+
+class MorceauCreate(BaseModel):
+    Titre: str
+    Duree: str
+    artisteID: int
+    Genre_ID: int
+    Album_ID: int
+
+# Modèle Pydantic pour la mise à jour d'un artiste
+class ArtisteUpdate(BaseModel):
+    Nom_artiste: Optional[str] = None
+    Avatar: Optional[str] = None
+    Biographie: Optional[str] = None
 
 #2. Opérations CRUD pour la table "Album"
 def get_album(db: Session, album_id: int):
@@ -20,80 +36,107 @@ def get_songs_by_album(db: Session, album_id: int):
 def get_genres(db: Session):
     return db.query(models.Genre).all()
 
-#Récupère la liste de tous les morceaux de l’artiste précisé par :id
+#5. Récupère la liste de tous les morceaux de l’artiste précisé par :id
 def get_songs_by_artist(db: Session, artist_id: int):
     return db.query(models.Morceau).filter(models.Morceau.artisteID == artist_id).all()
 
-#Ajout d’un utilisateur
+#6. Ajout d’un utilisateur
 def create_user(db: Session, user: UtilisateurCreate):
     db_user = models.Utilisateur(**user.dict())
     db.add(db_user)
     db.commit()
     db.refresh(db_user)
     return db_user
-#def get_albums(db: Session):
-    #return db.query(models.Album).all()
 
-#def get_album(db: Session, album_id: int):
-    #return db.query(models.Album).filter(models.Album.IDalbum == album_id).first()
+#7. Connexion d’un utilisateur (JWT)
+def authenticate_user(db: Session, username: str, password: str):
+    user = db.query(models.Utilisateur).filter(models.Utilisateur.Nom_utilisateur == username).first()
+    if user and user.Mot_de_passe == password:
+        return user
+    return None
 
-#def create_album(db: Session, album: models.Album):
-    #db_album = models.Album(**album.dict())
-    #db.add(db_album)
-    #db.commit()
-    #db.refresh(db_album)
-    #return db_album
+def get_user_by_username(db: Session, username: str):
+    return db.query(models.User).filter(models.User.username == username).first()
 
-#def update_album(db: Session, album_id: int, updated_album: models.Album):
-    #db_album = db.query(models.Album).filter(models.Album.IDalbum == album_id).first()
-    #if db_album:
-        #for key, value in updated_album.dict().items():
-            #setattr(db_album, key, value)
-        #db.commit()
-        #db.refresh(db_album)
-    #return db_album
 
-#def delete_album(db: Session, album_id: int):
-    #db_album = db.query(models.Album).filter(models.Album.IDalbum == album_id).first()
-    #if db_album:
-        #db.delete(db_album)
-        #db.commit()
-    #return db_album
+#8. Opération CRUD pour l'ajout d'un album
+# Fonction pour ajouter un album dans la base de données
+def create_album(db: Session, album: models.AlbumCreate):
+    return models.Album(**album.model_dump())
 
-# Ajoutez des opérations CRUD similaires pour les autres tables (Morceau, Artiste, Genre, Utilisateur) selon vos besoins
+#9. Fonction pour ajouter un morceau à un album dans la base de données
+def create_song_for_album(db: Session, album_id: int, song: models.MorceauCreate):
+    return models.Morceau(**song.model_dump(), Album_ID=album_id)
 
-# Opérations CRUD pour la table "Morceau"
-#def get_morceaux(db: Session):
-    #return db.query(models.Morceau).all()
 
-#def get_morceau(db: Session, morceau_id: int):
-    #return db.query(models.Morceau).filter(models.Morceau.IDmorceau == morceau_id).first()
+#10. Fonction pour mettre à jour un artiste dans la base de données
+def update_artist(db: Session, artist_id: int, updated_artist: models.ArtisteUpdate):
+    db_artist = db.query(models.Artiste).filter(models.Artiste.IDartiste == artist_id).first()
+    if db_artist:
+        for key, value in updated_artist.dict().items():
+            setattr(db_artist, key, value)
+        db.commit()
+        db.refresh(db_artist)
+    return db_artist
 
-# ...
+#11. Ajouter cette fonction pour mettre à jour un album
+def update_album(db: Session, album_id: int, updated_album: models.AlbumUpdate):
+    db_album = db.query(models.Album).filter(models.Album.IDalbum == album_id).first()
+    if db_album:
+        for key, value in updated_album.dict().items():
+            setattr(db_album, key, value)
+        db.commit()
+        db.refresh(db_album)
+    return db_album
 
-# Opérations CRUD pour la table "Artiste"
-#def get_artistes(db: Session):
-    #return db.query(models.Artiste).all()
+#12. Ajouter cette fonction pour mettre à jour un genre
+def update_genre(db: Session, genre_id: int, updated_genre: models.GenreUpdate):
+    db_genre = db.query(models.Genre).filter(models.Genre.IDgenre == genre_id).first()
+    if db_genre:
+        for key, value in updated_genre.dict().items():
+            setattr(db_genre, key, value)
+        db.commit()
+        db.refresh(db_genre)
+    return db_genre
 
-#def get_artiste(db: Session, artiste_id: int):
-    #return db.query(models.Artiste).filter(models.Artiste.IDartiste == artiste_id).first()
+#13. Suppression de utilisateur précisé par :id
+def delete_songs_by_user(db: Session, user_id: int):
+    user = db.query(Utilisateur).filter(Utilisateur.IDutilisateur == user_id).first() 
+    if user:
+        # Supprimez les morceaux associés à cet utilisateur
+        db.query(Morceau).filter(Morceau.artisteID == user.IDutilisateur).delete(synchronize_session='fetch')
+        db.commit()
 
-# ...
+#14.  suppression d'un album
+def delete_songs_by_album(db: Session, album_id: int):
+    # Supprimer les morceaux associés à l'album
+    db.query(models.Morceau).filter(models.Morceau.Album_ID == album_id).delete()
+    db.commit()
 
-# Opérations CRUD pour la table "Genre"
-#def get_genres(db: Session):
-    #return db.query(models.Genre).all()
+def delete_album(db: Session, album_id: int):
+    # Supprimer l'album
+    db_album = db.query(models.Album).filter(models.Album.IDalbum == album_id).first()
+    if db_album:
+        # Supprimer les morceaux associés à l'album
+        delete_songs_by_album(db, album_id)
+        db.delete(db_album)
+        db.commit()
+        return db_album
+    return None
 
-#def get_genre(db: Session, genre_id: int):
-    #return db.query(models.Genre).filter(models.Genre.IDgenre == genre_id).first()
+#15. Supression de l’artiste précisé par :id
+def delete_artist(db: Session, artist_id: int):
+    # Supprimer l'artiste
+    db_artist = db.query(models.Artiste).filter(models.Artiste.IDartiste == artist_id).first()
+    if db_artist:
+        # Supprimer les morceaux associés à l'artiste
+        delete_songs_by_artist(db, artist_id)
+        db.delete(db_artist)
+        db.commit()
+        return db_artist
+    return None
 
-# ...
-
-# Opérations CRUD pour la table "Utilisateur"
-#def get_utilisateurs(db: Session):
-    return db.query(models.Utilisateur).all()
-
-#def get_utilisateur(db: Session, utilisateur_id: int):
-    #return db.query(models.Utilisateur).filter(models.Utilisateur.IDutilisateur == utilisateur_id).first()
-
-# ...
+def delete_songs_by_artist(db: Session, artist_id: int):
+    # Supprimer les morceaux associés à l'artiste
+    db.query(models.Morceau).filter(models.Morceau.artisteID == artist_id).delete()
+    db.commit()
