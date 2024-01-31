@@ -19,7 +19,7 @@ from fastapi.exceptions import HTTPException
 from fastapi_spotilike1.crud import MorceauCreate 
 from fastapi_spotilike1.models import ArtisteResponse
 from fastapi_spotilike1.models import GenreResponse
-
+from passlib.context import CryptContext
 
 # FastAPI app
 app = FastAPI()
