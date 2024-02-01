@@ -296,13 +296,20 @@ async def delete_album(album_id: int, db: Session = Depends(database.get_db)):
     return deleted_album
 
 #15. DELETE - /api/artists/:id : Supression de l’artiste précisé par :id
-@app.delete("/api/artists/{artist_id}", response_model=None) #models.Artiste)
-async def delete_artist_endpoint(artist_id: int, db: Session = Depends(database.get_db)):
-    db_artist = crud.delete_artist(db, artist_id)
+@app.delete("/api/artists/{artist_id}", response_model=models.ArtisteResponse)
+async def delete_artist(artist_id: int, db: Session = Depends(database.get_db)):
+    # Vérifier si l'artiste existe
+    db_artist = crud.get_artist(db, artist_id)
     if db_artist is None:
-        raise HTTPException(status_code=404, detail="Artiste not found")
-    return db_artist
-#
+        raise HTTPException(status_code=404, detail="Artist not found")
+
+    # Supprimer tous les morceaux associés à cet artiste
+    crud.delete_songs_by_artist(db, artist_id)
+
+    # Supprimer l'artiste lui-même (avec suppression en cascade)
+    deleted_artist = crud.delete_artist(db, artist_id)
+
+    return deleted_artist
 #
 # Dependency to get the database session
 def get_db():

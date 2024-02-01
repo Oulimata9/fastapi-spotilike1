@@ -125,18 +125,15 @@ def delete_album(db: Session, album_id: int):
     return None
 
 #15. Supression de l’artiste précisé par :id
-def delete_artist(db: Session, artist_id: int):
-    # Supprimer l'artiste
-    db_artist = db.query(models.Artiste).filter(models.Artiste.IDartiste == artist_id).first()
-    if db_artist:
-        # Supprimer les morceaux associés à l'artiste
-        delete_songs_by_artist(db, artist_id)
-        db.delete(db_artist)
-        db.commit()
-        return db_artist
-    return None
-
 def delete_songs_by_artist(db: Session, artist_id: int):
-    # Supprimer les morceaux associés à l'artiste
     db.query(models.Morceau).filter(models.Morceau.artisteID == artist_id).delete()
     db.commit()
+
+# Fonction pour supprimer un artiste avec suppression en cascade
+def delete_artist(db: Session, artist_id: int):
+    db_artist = db.query(models.Artiste).filter(models.Artiste.IDartiste == artist_id).first()
+    if db_artist:
+        # Supprimer l'artiste
+        db.delete(db_artist)
+        db.commit()
+    return db_artist
