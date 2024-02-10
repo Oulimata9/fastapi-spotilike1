@@ -41,11 +41,18 @@ class Utilisateur(Base):
     Mot_de_passe = Column(String)
     Email = Column(String, index=True)
 
+class Genre(Base):
+    __tablename__ = "genre"
+    IDgenre = Column(Integer, primary_key=True)
+    Titre = Column(String, nullable=False)
+
+
 class UtilisateurCreate(BaseModel):
     # Définissez les champs de votre modèle UtilisateurCreate
     Nom_utilisateur: str
     Mot_de_passe: str
     Email: str
+
 
 class AlbumResponse(BaseModel):
     IDalbum: int

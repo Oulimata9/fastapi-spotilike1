@@ -1,4 +1,3 @@
-# Dans un fichier appelé, par exemple, security.py
 
 from passlib.context import CryptContext
 

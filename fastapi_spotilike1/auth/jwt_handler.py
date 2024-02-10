@@ -19,7 +19,7 @@ def signIW(userID : str):
         "userID" : userID,
         "expiry" : time.time() + 600
     } 
-    token = jwt. encode(payload, JWT_SECRET, algorith=JWT_ALGORITHM)
+    token = jwt.encode(payload, JWT_SECRET, algorith=JWT_ALGORITHM)
     return token_response(token)
 
 def decodeJWT(token: str) -> Mapping:

@@ -6,6 +6,8 @@ from pydantic import BaseModel
 from typing import Optional
 from sqlalchemy.orm import Session
 from .models import Utilisateur, Morceau
+from fastapi_spotilike1.models import Album
+from datetime import datetime
 
 
 class MorceauCreate(BaseModel):
@@ -30,7 +32,10 @@ def get_albums(db: Session):
 
 #3. Fonction CRUD pour la table "Morceau"
 def get_songs_by_album(db: Session, album_id: int):
-    return db.query(models.Morceau).filter(models.Morceau.IDalbum == album_id).all()
+    return db.query(models.Morceau).filter(models.Morceau.Album_ID == album_id).all()
+
+
+#db.query(models.Morceau).filter(models.Morceau.IDalbum == album_id).all()
 
 #4. Récupère la liste de tous les genres
 def get_genres(db: Session):
@@ -40,20 +45,32 @@ def get_genres(db: Session):
 def get_songs_by_artist(db: Session, artist_id: int):
     return db.query(models.Morceau).filter(models.Morceau.artisteID == artist_id).all()
 
-#6. Ajout d’un utilisateur
-def create_user(db: Session, user: UtilisateurCreate):
-    db_user = models.Utilisateur(**user.dict())
+def get_artiste(db: Session, artist_id: int):
+    """
+    Récupère un artiste par son ID.
+    
+    Args:
+    - db: Session SQLAlchemy
+    - artist_id: ID de l'artiste à récupérer
+    
+    Returns:
+    - L'artiste récupéré ou None s'il n'existe pas
+    """
+    return db.query(models.Artiste).filter(models.Artiste.IDartiste == artist_id).first()
+
+def create_user(db: Session, user: models.UtilisateurCreate):
+    db_user = models.Utilisateur(Nom_utilisateur=user.Nom_utilisateur, Mot_de_passe=user.Mot_de_passe, Email=user.Email)
     db.add(db_user)
     db.commit()
     db.refresh(db_user)
     return db_user
 
 #7. Connexion d’un utilisateur (JWT)
-def authenticate_user(db: Session, username: str, password: str):
-    user = db.query(models.Utilisateur).filter(models.Utilisateur.Nom_utilisateur == username).first()
-    if user and user.Mot_de_passe == password:
-        return user
-    return None
+#def authenticate_user(db: Session, username: str, password: str):
+ #   user = db.query(models.Utilisateur).filter(models.Utilisateur.Nom_utilisateur == username).first()
+  #  if user and user.Mot_de_passe == password:
+   #     return user
+    #return None
 
 def get_user_by_username(db: Session, username: str):
     return db.query(models.User).filter(models.User.username == username).first()
@@ -62,11 +79,38 @@ def get_user_by_username(db: Session, username: str):
 #8. Opération CRUD pour l'ajout d'un album
 # Fonction pour ajouter un album dans la base de données
 def create_album(db: Session, album: models.AlbumCreate):
-    return models.Album(**album.model_dump())
+    # Convertir la chaîne de date en objet de date Python
+    date_sortie = datetime.strptime(album.Date_sortie, "%Y-%m-%d").date()
+
+    # Créer l'objet Album avec la date convertie
+    db_album = Album(
+        Titre=album.Titre,
+        Pochette=album.Pochette,
+        Date_sortie=date_sortie,
+        liste_morceaux=album.liste_morceaux,
+        Artiste_ID=album.Artiste_ID
+    )
+
+    # Ajouter l'objet Album à la session et le sauvegarder dans la base de données
+    db.add(db_album)
+    db.commit()
+    db.refresh(db_album)
+
+    return db_album
 
 #9. Fonction pour ajouter un morceau à un album dans la base de données
 def create_song_for_album(db: Session, album_id: int, song: models.MorceauCreate):
-    return models.Morceau(**song.model_dump(), Album_ID=album_id)
+    new_song = models.Morceau(
+        Titre=song.Titre,
+        Duree=song.Duree,
+        artisteID=song.artisteID,
+        Genre_ID=song.Genre_ID,
+        Album_ID=album_id
+    )
+    db.add(new_song)
+    db.commit()
+    db.refresh(new_song)
+    return new_song
 
 
 #10. Fonction pour mettre à jour un artiste dans la base de données

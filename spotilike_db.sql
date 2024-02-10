@@ -36,7 +36,7 @@ CREATE TABLE IF NOT EXISTS `album` (
   `liste_morceaux` varchar(45) DEFAULT NULL,
   `Artiste_ID` int DEFAULT NULL,
   PRIMARY KEY (`IDalbum`),
-  KEY `Artiste_ID` (`Artiste_ID`)
+  KEY `Artiste_ID` (`IDartiste`)
 ) ENGINE=InnoDB AUTO_INCREMENT=3 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 --
@@ -109,9 +109,9 @@ CREATE TABLE IF NOT EXISTS `morceau` (
   `Genre_ID` int DEFAULT NULL,
   `Album_ID` int DEFAULT NULL,
   PRIMARY KEY (`IDmorceau`),
-  KEY `artisteID` (`artisteID`),
-  KEY `Genre_ID` (`Genre_ID`),
-  KEY `Album_ID` (`Album_ID`)
+  KEY `artisteID` (`IDartiste`),
+  KEY `Genre_ID` (`IDgenre`),
+  KEY `Album_ID` (`IDalbum`)
 ) ENGINE=InnoDB AUTO_INCREMENT=15 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 --
